@@ -310,10 +310,51 @@ extension ChatQuery.ChatCompletionMessageParam {
     }
 }
 
-extension ChatQuery.ChatCompletionMessageParam.UserMessageParam.Content {
-    enum ContentDecodingError: Error {
-        case unableToDecodeNeitherOfPossibleTypes(Decoder, [Error])
+enum ContentDecodingError: Error {
+    case unableToDecodeNeitherOfPossibleTypes(Decoder, [Error])
+}
+
+extension ChatQuery.ChatCompletionMessageParam.TextOrRefusalContent {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        var errors: [Error] = []
+        do {
+            self = try .textContent(container.decode(String.self))
+            return
+        } catch {
+            errors.append(error)
+        }
+        do {
+            self = try .contentParts(container.decode([ChatQuery.ChatCompletionMessageParam.TextOrRefusalContent.ContentPart].self))
+            return
+        } catch {
+            errors.append(error)
+        }
+        throw ContentDecodingError.unableToDecodeNeitherOfPossibleTypes(decoder, errors)
     }
+}
+
+extension ChatQuery.ChatCompletionMessageParam.TextContent {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        var errors: [Error] = []
+        do {
+            self = try .textContent(container.decode(String.self))
+            return
+        } catch {
+            errors.append(error)
+        }
+        do {
+            self = try .contentParts(container.decode([ChatQuery.ChatCompletionMessageParam.ContentPartTextParam].self))
+            return
+        } catch {
+            errors.append(error)
+        }
+        throw ContentDecodingError.unableToDecodeNeitherOfPossibleTypes(decoder, errors)
+    }
+}
+
+extension ChatQuery.ChatCompletionMessageParam.UserMessageParam.Content {
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
