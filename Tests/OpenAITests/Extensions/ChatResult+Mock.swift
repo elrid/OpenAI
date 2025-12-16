@@ -16,6 +16,6 @@ extension ChatResult {
     ], usage: .init(completionTokens: 200, promptTokens: 100, totalTokens: 300, promptTokensDetails: nil), citations: nil)
     
     static func mockChatResultChoiceMessage(content: String, role: String) -> ChatResult.Choice.Message {
-        .init(content: content, refusal: nil, role: role, annotations: [], audio: nil, toolCalls: [], _reasoning: nil, _reasoningContent: nil)
+        .init(content: content, refusal: nil, role: role, annotations: [], audio: nil, toolCalls: [], _reasoning: nil, _reasoningContent: nil, reasoningDetails: nil)
     }
 }

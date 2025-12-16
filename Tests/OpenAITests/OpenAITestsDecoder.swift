@@ -66,7 +66,7 @@ class OpenAITestsDecoder: XCTestCase {
                 .init(
                     index: 0,
                     logprobs: nil,
-                    message: .init(content: "Hello, world!", refusal: nil, role: "assistant", annotations: [], audio: nil, toolCalls: [], _reasoning: nil, _reasoningContent: nil),
+                    message: .init(content: "Hello, world!", refusal: nil, role: "assistant", annotations: [], audio: nil, toolCalls: [], _reasoning: nil, _reasoningContent: nil, reasoningDetails: nil),
                     finishReason: "stop"
                 )
             ],
@@ -308,7 +308,8 @@ class OpenAITestsDecoder: XCTestCase {
                         audio: nil,
                         toolCalls: [.init(id: "chatcmpl-1234", function: .init(arguments: "", name: "get_current_weather"))],
                         _reasoning: nil,
-                        _reasoningContent: nil
+                        _reasoningContent: nil,
+                        reasoningDetails: nil
                     ),
                     finishReason: "tool_calls"
                 )
@@ -756,5 +757,235 @@ class OpenAITestsDecoder: XCTestCase {
         let titleSchema = try XCTUnwrap(properties["title"])
         XCTAssertEqual(titleSchema.count, 1)
         XCTAssertEqual(try XCTUnwrap(titleSchema["type"] as? String), "string")
+    }
+    
+    // MARK: - Reasoning Details Tests
+    
+    func testChatStreamResultWithReasoningDetailsText() throws {
+        let data = """
+        {
+          "id": "gen-123",
+          "object": "chat.completion.chunk",
+          "created": 1677652288,
+          "model": "google/gemini-3-pro-preview",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": "",
+                "reasoning": "Thinking about the problem...",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Considering the Test Flow**\\n\\nI've outlined the steps.",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        }
+        """
+        
+        let decoded = try JSONDecoder().decode(ChatStreamResult.self, from: data.data(using: .utf8)!)
+        
+        XCTAssertEqual(decoded.id, "gen-123")
+        XCTAssertEqual(decoded.choices.count, 1)
+        
+        let delta = decoded.choices[0].delta
+        XCTAssertEqual(delta.reasoning, "Thinking about the problem...")
+        XCTAssertNotNil(delta.reasoningDetails)
+        XCTAssertEqual(delta.reasoningDetails?.count, 1)
+        
+        if case .text(let textDetail) = delta.reasoningDetails?[0] {
+            XCTAssertEqual(textDetail.type, "reasoning.text")
+            XCTAssertEqual(textDetail.text, "**Considering the Test Flow**\n\nI've outlined the steps.")
+            XCTAssertEqual(textDetail.format, "google-gemini-v1")
+            XCTAssertEqual(textDetail.index, 0)
+        } else {
+            XCTFail("Expected reasoning.text type")
+        }
+    }
+    
+    func testChatStreamResultWithReasoningDetailsEncrypted() throws {
+        let data = """
+        {
+          "id": "gen-456",
+          "object": "chat.completion.chunk",
+          "created": 1677652288,
+          "model": "google/gemini-3-pro-preview",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": null,
+                "reasoning_details": [
+                  {
+                    "id": "tool_open_url_abc123",
+                    "type": "reasoning.encrypted",
+                    "data": "CiQBjz1rX8f6FOgMbpbLYty==",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": "tool_calls"
+            }
+          ]
+        }
+        """
+        
+        let decoded = try JSONDecoder().decode(ChatStreamResult.self, from: data.data(using: .utf8)!)
+        
+        XCTAssertEqual(decoded.id, "gen-456")
+        XCTAssertEqual(decoded.choices.count, 1)
+        
+        let delta = decoded.choices[0].delta
+        XCTAssertNotNil(delta.reasoningDetails)
+        XCTAssertEqual(delta.reasoningDetails?.count, 1)
+        
+        if case .encrypted(let encryptedDetail) = delta.reasoningDetails?[0] {
+            XCTAssertEqual(encryptedDetail.id, "tool_open_url_abc123")
+            XCTAssertEqual(encryptedDetail.type, "reasoning.encrypted")
+            XCTAssertEqual(encryptedDetail.data, "CiQBjz1rX8f6FOgMbpbLYty==")
+            XCTAssertEqual(encryptedDetail.format, "google-gemini-v1")
+            XCTAssertEqual(encryptedDetail.index, 0)
+        } else {
+            XCTFail("Expected reasoning.encrypted type")
+        }
+    }
+    
+    func testChatStreamResultWithMixedReasoningDetails() throws {
+        let data = """
+        {
+          "id": "gen-789",
+          "object": "chat.completion.chunk",
+          "created": 1677652288,
+          "model": "google/gemini-3-pro-preview",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": "Hello",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "Step 1: Analyze",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  },
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "encrypted_data_here",
+                    "format": "google-gemini-v1",
+                    "index": 1
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        }
+        """
+        
+        let decoded = try JSONDecoder().decode(ChatStreamResult.self, from: data.data(using: .utf8)!)
+        
+        XCTAssertEqual(decoded.choices[0].delta.reasoningDetails?.count, 2)
+        
+        if case .text(let textDetail) = decoded.choices[0].delta.reasoningDetails?[0] {
+            XCTAssertEqual(textDetail.text, "Step 1: Analyze")
+        } else {
+            XCTFail("Expected first item to be reasoning.text")
+        }
+        
+        if case .encrypted(let encryptedDetail) = decoded.choices[0].delta.reasoningDetails?[1] {
+            XCTAssertEqual(encryptedDetail.data, "encrypted_data_here")
+        } else {
+            XCTFail("Expected second item to be reasoning.encrypted")
+        }
+    }
+    
+    func testChatStreamResultWithEmptyReasoningDetails() throws {
+        let data = """
+        {
+          "id": "gen-empty",
+          "object": "chat.completion.chunk",
+          "created": 1677652288,
+          "model": "google/gemini-3-pro-preview",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": "Response",
+                "reasoning_details": []
+              },
+              "finish_reason": null
+            }
+          ]
+        }
+        """
+        
+        let decoded = try JSONDecoder().decode(ChatStreamResult.self, from: data.data(using: .utf8)!)
+        
+        XCTAssertNotNil(decoded.choices[0].delta.reasoningDetails)
+        XCTAssertEqual(decoded.choices[0].delta.reasoningDetails?.count, 0)
+    }
+    
+    func testChatResultWithReasoningDetails() throws {
+        let data = """
+        {
+          "id": "chatcmpl-reasoning",
+          "object": "chat.completion",
+          "created": 1677652288,
+          "model": "google/gemini-3-pro-preview",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "The answer is 42.",
+                "annotations": [],
+                "reasoning": "Calculating the ultimate answer...",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "Deep thought processing...",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": "stop",
+              "logprobs": null
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30
+          },
+          "system_fingerprint": "fp_test"
+        }
+        """
+        
+        let decoded = try JSONDecoder().decode(ChatResult.self, from: data.data(using: .utf8)!)
+        
+        XCTAssertEqual(decoded.id, "chatcmpl-reasoning")
+        XCTAssertEqual(decoded.choices[0].message.reasoning, "Calculating the ultimate answer...")
+        XCTAssertNotNil(decoded.choices[0].message.reasoningDetails)
+        XCTAssertEqual(decoded.choices[0].message.reasoningDetails?.count, 1)
+        
+        if case .text(let textDetail) = decoded.choices[0].message.reasoningDetails?[0] {
+            XCTAssertEqual(textDetail.text, "Deep thought processing...")
+            XCTAssertEqual(textDetail.format, "google-gemini-v1")
+        } else {
+            XCTFail("Expected reasoning.text type")
+        }
     }
 }
