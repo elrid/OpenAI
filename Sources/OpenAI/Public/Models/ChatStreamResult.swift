@@ -108,74 +108,8 @@ public struct ChatStreamResult: Codable, Equatable, Sendable {
             }
 
             /// Detailed reasoning information returned by some providers.
-            ///
-            /// Provided by:
-            /// - OpenRouter (with Gemini models)
-            ///
-            /// Contains either readable text reasoning or encrypted reasoning data.
-            public enum ReasoningDetail: Codable, Equatable, Sendable {
-                /// Readable reasoning text.
-                case text(ReasoningText)
-                /// Encrypted reasoning data.
-                case encrypted(ReasoningEncrypted)
-
-                /// Reasoning text detail with readable content.
-                public struct ReasoningText: Codable, Equatable, Sendable {
-                    /// The type identifier. Always "reasoning.text".
-                    public let type: String
-                    /// The reasoning text content.
-                    public let text: String
-                    /// The format of the reasoning (e.g., "google-gemini-v1").
-                    public let format: String?
-                    /// The index of this reasoning detail.
-                    public let index: Int?
-                }
-
-                /// Encrypted reasoning detail.
-                public struct ReasoningEncrypted: Codable, Equatable, Sendable {
-                    /// Optional identifier for the encrypted reasoning.
-                    public let id: String?
-                    /// The type identifier. Always "reasoning.encrypted".
-                    public let type: String
-                    /// Base64 encoded encrypted reasoning data.
-                    public let data: String
-                    /// The format of the reasoning (e.g., "google-gemini-v1").
-                    public let format: String?
-                    /// The index of this reasoning detail.
-                    public let index: Int?
-                }
-
-                private enum CodingKeys: String, CodingKey {
-                    case type
-                }
-
-                public init(from decoder: Decoder) throws {
-                    let container = try decoder.container(keyedBy: CodingKeys.self)
-                    let type = try container.decode(String.self, forKey: .type)
-
-                    switch type {
-                    case "reasoning.text":
-                        self = .text(try ReasoningText(from: decoder))
-                    case "reasoning.encrypted":
-                        self = .encrypted(try ReasoningEncrypted(from: decoder))
-                    default:
-                        throw DecodingError.dataCorruptedError(
-                            forKey: .type,
-                            in: container,
-                            debugDescription: "Unknown reasoning detail type: \(type)"
-                        )
-                    }
-                }
-
-                public func encode(to encoder: Encoder) throws {
-                    switch self {
-                    case .text(let value):
-                        try value.encode(to: encoder)
-                    case .encrypted(let value):
-                        try value.encode(to: encoder)
-                    }
-                }
-            }
+            /// Uses the same type as `ChatResult.Choice.Message.ReasoningDetail`.
+            public typealias ReasoningDetail = ChatResult.Choice.Message.ReasoningDetail
 
             /// Detailed reasoning information.
             ///
