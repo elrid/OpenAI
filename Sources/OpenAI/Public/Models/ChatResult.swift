@@ -155,12 +155,14 @@ public struct ChatResult: Codable, Equatable, Sendable {
             /// Provided by:
             /// - OpenRouter (with Gemini models)
             ///
-            /// Contains either readable text reasoning or encrypted reasoning data.
+            /// Contains either readable text reasoning, encrypted reasoning data, or a summary.
             public enum ReasoningDetail: Codable, Equatable, Sendable {
                 /// Readable reasoning text.
                 case text(ReasoningText)
                 /// Encrypted reasoning data.
                 case encrypted(ReasoningEncrypted)
+                /// Reasoning summary.
+                case summary(ReasoningSummary)
 
                 /// Reasoning text detail with readable content.
                 public struct ReasoningText: Codable, Equatable, Sendable {
@@ -188,6 +190,18 @@ public struct ChatResult: Codable, Equatable, Sendable {
                     public let index: Int?
                 }
 
+                /// Reasoning summary detail.
+                public struct ReasoningSummary: Codable, Equatable, Sendable {
+                    /// The type identifier. Always "reasoning.summary".
+                    public let type: String
+                    /// The summary text content.
+                    public let summary: String
+                    /// The format of the reasoning (e.g., "openai-responses-v1").
+                    public let format: String?
+                    /// The index of this reasoning detail.
+                    public let index: Int?
+                }
+
                 private enum CodingKeys: String, CodingKey {
                     case type
                 }
@@ -201,6 +215,8 @@ public struct ChatResult: Codable, Equatable, Sendable {
                         self = .text(try ReasoningText(from: decoder))
                     case "reasoning.encrypted":
                         self = .encrypted(try ReasoningEncrypted(from: decoder))
+                    case "reasoning.summary":
+                        self = .summary(try ReasoningSummary(from: decoder))
                     default:
                         throw DecodingError.dataCorruptedError(
                             forKey: .type,
@@ -215,6 +231,8 @@ public struct ChatResult: Codable, Equatable, Sendable {
                     case .text(let value):
                         try value.encode(to: encoder)
                     case .encrypted(let value):
+                        try value.encode(to: encoder)
+                    case .summary(let value):
                         try value.encode(to: encoder)
                     }
                 }

@@ -859,6 +859,53 @@ class OpenAITestsDecoder: XCTestCase {
         }
     }
     
+    func testChatStreamResultWithReasoningDetailsSummary() throws {
+        let data = """
+        {
+          "id": "gen-summary-123",
+          "object": "chat.completion.chunk",
+          "created": 1677652288,
+          "model": "o3",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": null,
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.summary",
+                    "summary": "**Planning",
+                    "format": "openai-responses-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null
+            }
+          ]
+        }
+        """
+        
+        let decoded = try JSONDecoder().decode(ChatStreamResult.self, from: data.data(using: .utf8)!)
+        
+        XCTAssertEqual(decoded.id, "gen-summary-123")
+        XCTAssertEqual(decoded.choices.count, 1)
+        
+        let delta = decoded.choices[0].delta
+        XCTAssertNotNil(delta.reasoningDetails)
+        XCTAssertEqual(delta.reasoningDetails?.count, 1)
+        
+        if case .summary(let summaryDetail) = delta.reasoningDetails?[0] {
+            XCTAssertEqual(summaryDetail.type, "reasoning.summary")
+            XCTAssertEqual(summaryDetail.summary, "**Planning")
+            XCTAssertEqual(summaryDetail.format, "openai-responses-v1")
+            XCTAssertEqual(summaryDetail.index, 0)
+        } else {
+            XCTFail("Expected reasoning.summary type")
+        }
+    }
+    
     func testChatStreamResultWithMixedReasoningDetails() throws {
         let data = """
         {
